@@ -11,7 +11,7 @@
 namespace cli_parser {
     using namespace std;
 
-    // Option. Represent one single option with required type. 
+    // Option. Represents one single option with required type. 
     // If required arg's type is `tuple<>` then the option 
     // doesn't expect for a value.
     template<typename T>
@@ -97,11 +97,8 @@ namespace cli_parser {
                 continue;
             }
 
-            auto value = visit([narg, argv](auto option) mutable { 
-                    auto [value, advance_narg] = parse_value<decltype(option)>(narg, argv);
-                    if (advance_narg) ++narg;
-                    return value;
-            }, *option_it);
+            auto [value, advance_narg] = visit([narg, argv](auto option) mutable { return parse_value<decltype(option)>(narg, argv); }, *option_it);
+            if (advance_narg) ++narg;
 
             result.options.emplace_back(name, move(value));
         }

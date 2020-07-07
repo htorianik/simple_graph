@@ -169,10 +169,7 @@ int main(int argc, char **argv) {
         }
     });
 
-    /*
-    auto args = cli_parser::parse(argc, argv, {"-a", "--average", "-s", "--separator"}, {});
-
-    if (!args.inputs.size()) {
+    if (!args.positional.size()) {
         std::cout  
             << "sgraph, version " << VERSION        << std::endl << std::endl
             << "usage: sgraph fname1 ... fnameN"    << std::endl;
@@ -180,7 +177,7 @@ int main(int argc, char **argv) {
     } 
 
     std::vector<Dataset> dsets;
-    for (auto fname: args.inputs) {
+    for (auto fname: args.positional) {
         auto mb_dset = csv_to_dataset(fname);
         if (std::holds_alternative<std::string>(mb_dset)) {
             std::cerr << fmt_error(std::get<std::string>(mb_dset)) << std::endl;
@@ -190,9 +187,9 @@ int main(int argc, char **argv) {
     } 
 
     dsets = normilize_dsets(std::move(dsets));
-    for (auto &[key, val]: args.key_values) {
+    for (auto &[key, val]: args.options) {
         if (key == "-a" || key == "--average") {
-            uint32_t nneigbours = std::stoi(val);
+            uint32_t nneigbours = std::get<int>(val);
             for (uint32_t i = 0; i < dsets.size(); ++i) {
                 dsets[i] = average(std::move(dsets[i]), nneigbours);
             }
@@ -204,5 +201,4 @@ int main(int argc, char **argv) {
     graph.render(dsets);
     graph.loop();
     return 0;
-    */
 }
