@@ -26,7 +26,7 @@ std::string fmt_error(std::string msg) {
     return ss.str();
 }
 
-Maybe<Dataset> csv_to_dataset(std::string fname) {
+Maybe<Dataset> csv_to_dataset(std::string fname, char separator='\n') {
     std::ifstream csv_ss(fname);
     if (!csv_ss.is_open()) {
         std::stringstream err_ss;
@@ -150,7 +150,27 @@ struct Graph {
 };
 
 int main(int argc, char **argv) {
-    auto args = cli_parser::parse(argc, argv, {"-a", "--average"}, {});
+    using namespace cli_parser;
+    auto args = parse(argc, argv, {
+        Option<int> {
+            .full_name = "--average",
+            .short_name = "-a",
+            .description = "Every value becomes average between it's 10 neighbours."
+        },
+        Option<char> { 
+            .full_name = "--sep",
+            .short_name = "-s",
+            .description = "Custom separator between columns in providen csv file (Defualt is ',')."
+        },
+        Option<string> {
+            .full_name = "--output",
+            .short_name = "-o",
+            .description = "Output filename. Available extensions are \".png\". (Default is \"output.png\")."
+        }
+    });
+
+    /*
+    auto args = cli_parser::parse(argc, argv, {"-a", "--average", "-s", "--separator"}, {});
 
     if (!args.inputs.size()) {
         std::cout  
@@ -184,4 +204,5 @@ int main(int argc, char **argv) {
     graph.render(dsets);
     graph.loop();
     return 0;
+    */
 }
