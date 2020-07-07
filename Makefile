@@ -6,8 +6,8 @@ LINK = -lSDL2
 app : sdl_test.o
 	g++ -L$(LIBRARY) $(LINK) -o bin/app bin/sdl_test.o 
 
-sdl_test.o : main.cxx 
-	g++ -c $(CXX_OPTIONS) -I$(INCLUDE) -o bin/sdl_test.o main.cxx
+sdl_test.o : src/main.cxx 
+	g++ -c $(CXX_OPTIONS) -I$(INCLUDE) -o bin/sdl_test.o src/main.cxx
 
 clean:
 	rm bin/*
