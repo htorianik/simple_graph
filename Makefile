@@ -1,7 +1,7 @@
 CXX_OPTIONS = -std=c++17 -Wall
 INCLUDE = /usr/local/Cellar/sdl2/2.0.12_1/include
 LIBRARY = /usr/local/Cellar/sdl2/2.0.12_1/lib
-LINK = -lSDL2
+LINK = -lSDL2 -lSDL2_ttf
 
 app : sdl_test.o
 	g++ -L$(LIBRARY) $(LINK) -o bin/app bin/sdl_test.o 

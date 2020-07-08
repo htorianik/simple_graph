@@ -8,6 +8,7 @@
 #include <algorithm>
 
 #include "SDL2/SDL.h"
+#include "SDL2/SDL_ttf.h"
 
 #include "cli_parser.hxx"
 
@@ -15,7 +16,6 @@
 
 template<typename T> 
 using Maybe = typename std::variant<T, std::string>;
-
 using Dataset = std::vector<std::pair<float, float>>;
 
 std::string fmt_error(std::string msg) {
@@ -113,33 +113,68 @@ struct Graph {
     uint32_t y_res;
     SDL_Renderer *renderer;
     SDL_Window *window;
+    TTF_Font *arial;
 
     Graph(uint32_t x_res, uint32_t y_res): x_res(x_res), y_res(y_res) {
         SDL_Init(SDL_INIT_VIDEO);
         SDL_CreateWindowAndRenderer(x_res, y_res, 0, &window, &renderer);
+        TTF_Init();
+        arial = TTF_OpenFont("resources/arial.ttf", 24);
     }
 
-    void render(const std::vector<Dataset> &dsets) {
-        const struct { uint8_t r, g, b; } palette[] = {
-            {255, 0, 0},
-            {0, 255, 0},
-            {0, 0, 255},
-        };
+    // 253, 255, 252 – May be useful for axis...
+    template<typename TDsetsContainer, typename TAnnotationsContainer>
+    void render(const TDsetsContainer &dsets, const TAnnotationsContainer &annotations) {
+        const struct { uint8_t r, g, b; } 
+            background = { 22,   25,  37},
+            info_panel = { 253, 255, 252},
+            palette[] = {
+                { 35,  87, 135},
+                {193,  41,  46},
+                {241, 211,   2},
+            };
 
+        // Render canvas
+        const uint32_t canvas_x_res = x_res;
+        const uint32_t canvas_y_res = y_res - 50;
+
+        SDL_SetRenderDrawColor(renderer, background.r, background.g, background.b, 0);
 		SDL_RenderClear(renderer);
-
         uint32_t icolor = 0;
         for (auto &dset: dsets) {
             auto color = palette[icolor++];
             SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 0);
             for (int i = 0; i < dset.size() - 1; ++i) {
-                uint32_t x1 = dset[i].first * x_res;
-                uint32_t y1 = dset[i].second * y_res;
-                uint32_t x2 = dset[i + 1].first * x_res;
-                uint32_t y2 = dset[i + 1].second * y_res;
+                uint32_t x1 = dset[i].first * canvas_x_res;
+                uint32_t y1 = dset[i].second * canvas_y_res;
+                uint32_t x2 = dset[i + 1].first * canvas_x_res;
+                uint32_t y2 = dset[i + 1].second * canvas_y_res;
                 SDL_RenderDrawLine(renderer, x1, y1, x2, y2);
             } 
         } 
+
+        // Render annotation
+        auto panel_rect = std::tuple<uint32_t, uint32_t, uint32_t, uint32_t>(x_res - canvas_x_res, canvas_y_res, x_res, y_res - canvas_y_res);
+        SDL_SetRenderDrawColor(renderer, info_panel.r, info_panel.g, info_panel.b, 0);
+        SDL_RenderFillRect(renderer, (SDL_Rect*)&panel_rect);  
+        icolor = 0;
+        uint32_t ann_offset = 0;
+        uint32_t ann_size = 200;
+        for (auto ann: annotations) {
+            SDL_Color black = {  0,  0,  0};
+            SDL_Surface* font_surf = TTF_RenderText_Solid(arial, ann.c_str(), black); 
+            SDL_Texture* font_tex = SDL_CreateTextureFromSurface(renderer, font_surf);
+            SDL_Rect ann_rect;
+            ann_rect.x = ann_offset;
+            ann_rect.y = (canvas_y_res + y_res) / 2 - 12;
+            ann_rect.w = ann_size; 
+            ann_rect.h = 24;
+            SDL_RenderCopy(renderer, font_tex, NULL, &ann_rect);
+            SDL_FreeSurface(font_surf);
+            SDL_DestroyTexture(font_tex);
+            ann_offset += ann_size;
+        }
+
 
 		SDL_RenderPresent(renderer);		
     }
@@ -154,6 +189,7 @@ struct Graph {
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
         SDL_Quit();
+        TTF_Quit();
     }
 };
 
@@ -228,7 +264,7 @@ int main(int argc, char **argv) {
     dsets = normilize_dsets(std::move(dsets));
 
     Graph graph(512, 512);
-    graph.render(dsets);
+    graph.render(dsets, args.positional);
     graph.loop();
     return 0;
 }
