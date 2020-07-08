@@ -7,6 +7,7 @@
 #include <list>
 #include <typeindex>
 #include <algorithm>
+#include <unordered_map>
 
 namespace cli_parser {
     using namespace std;
@@ -60,8 +61,9 @@ namespace cli_parser {
     // return.2 – flag if narg was advanced in order to get the value.
     template<typename T>
     tuple<Value, bool> parse_value(uint32_t narg, char **argv) {
-        if constexpr (is_same<typename T::req_type, tuple<>>::value) return {Value(tuple<>()), false};  // Options doesn't expect for an arument.
-        else if constexpr (is_same<typename T::req_type, string>::value) return {argv[narg + 1], true}; // Argument is a string.
+        if constexpr (is_same<typename T::req_type, tuple<>>::value) return {Value(tuple<>()), false};      // Options doesn't expect for an arument.
+        else if constexpr (is_same<typename T::req_type, string>::value) return {argv[narg + 1], true};     // Argument is a string.
+        else if constexpr (is_same<typename T::req_type, char>::value) return {argv[narg + 1][0], true};    // Argument is a char.
         else {
             string value_str = argv[narg + 1];
             stringstream ss(value_str);
@@ -86,7 +88,7 @@ namespace cli_parser {
     // argv     – list of arguments.
     // options  – list of options parametrizes by the type of values it requires. `tuple<>` means
     //            this option isn't require value at all.
-    ParsedResult parse(uint32_t argc, char **argv, list<GenOption> options) {
+    ParsedResult parse(uint32_t argc, char **argv, const list<GenOption> &options) {
         ParsedResult result;
         for (uint32_t narg = 1; narg < argc; ++narg) {
             auto name = argv[narg];
@@ -103,6 +105,40 @@ namespace cli_parser {
             result.options.emplace_back(name, move(value));
         }
         return result;
+    }
+
+    template<typename T>
+    string help_opt(T option) {
+        std::unordered_map<type_index, string> type_aliases = {
+            { typeid(int), "integer" },
+            { typeid(char), "char" },
+            { typeid(float), "float" },
+            { typeid(string), "string" },
+        };
+        stringstream ss;
+        ss << "[" << option.short_name;
+        if constexpr (!is_same<typename T::req_type, tuple<>>::value) {
+            ss << " <" << type_aliases[typeid(typename T::req_type)] << ">";
+        }
+        ss << "]";
+        return ss.str();
+    }
+
+    string help(string util_name, string additional, const list<GenOption> &options) {
+        const uint32_t max_len = 80;
+        uint32_t cur_line_len = 0;
+        stringstream ss;
+        ss << "usage: " << util_name << " " << additional << " ";
+        for (auto option: options) {
+            string option_help = visit([](auto opt) { return help_opt(opt); }, option);
+            if (cur_line_len + option_help.length() >= max_len) {
+                cout << "\n\t";
+                cur_line_len = 0;
+            }
+            ss << option_help << " ";
+            cur_line_len += option_help.length() + 1;
+        }
+        return ss.str();
     }
 };
 

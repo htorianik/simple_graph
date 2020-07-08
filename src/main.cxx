@@ -11,7 +11,7 @@
 
 #include "cli_parser.hxx"
 
-#define VERSION "0.0.1"
+#define VERSION "0.0.2 alpha"
 
 template<typename T> 
 using Maybe = typename std::variant<T, std::string>;
@@ -26,7 +26,15 @@ std::string fmt_error(std::string msg) {
     return ss.str();
 }
 
-Maybe<Dataset> csv_to_dataset(std::string fname, char separator='\n') {
+std::string fmt_help(std::list<cli_parser::GenOption> options, std::string version) {
+    std::stringstream ss;
+    ss 
+        << "simple_graph, version " << version << std::endl
+        << cli_parser::help("simple_graph", "[fname ...]", options);
+    return ss.str();
+}
+
+Maybe<Dataset> csv_to_dataset(std::string fname, char separator) {
     std::ifstream csv_ss(fname);
     if (!csv_ss.is_open()) {
         std::stringstream err_ss;
@@ -40,7 +48,7 @@ Maybe<Dataset> csv_to_dataset(std::string fname, char separator='\n') {
     for (std::string line; std::getline(csv_ss, line, '\n'); ++line_number) {
         std::vector<float> columns;
         std::stringstream line_ss(line);
-        for (std::string col; std::getline(line_ss, col, ','); ++col_number) {
+        for (std::string col; std::getline(line_ss, col, separator); ++col_number) {
             try {
                 columns.push_back(std::stof(col));
             } catch (std::invalid_argument exc) {
@@ -150,35 +158,56 @@ struct Graph {
 };
 
 int main(int argc, char **argv) {
-    using namespace cli_parser;
-    auto args = parse(argc, argv, {
-        Option<int> {
+    const std::list<cli_parser::GenOption> options = {
+        cli_parser::Option<int> {
             .full_name = "--average",
             .short_name = "-a",
             .description = "Every value becomes average between it's 10 neighbours."
         },
-        Option<char> { 
+        cli_parser::Option<char> { 
             .full_name = "--sep",
             .short_name = "-s",
             .description = "Custom separator between columns in providen csv file (Defualt is ',')."
         },
-        Option<string> {
+        cli_parser::Option<std::string> {
             .full_name = "--output",
             .short_name = "-o",
             .description = "Output filename. Available extensions are \".png\". (Default is \"output.png\")."
+        },
+        cli_parser::Option<std::tuple<>> {
+            .full_name = "--help",
+            .short_name = "-h",
+            .description = "Print help message.",
         }
-    });
+    };
 
+    auto args = cli_parser::parse(argc, argv, options);
+
+    // Handle -h | --help
+    if (std::find_if(args.options.begin(), args.options.end(), 
+        [](auto opt) -> bool { return (opt.first == "-h" || opt.first == "--help"); }) != args.options.end()) {
+        std::cout << fmt_help(options, VERSION) << std::endl;
+        return 0;
+    }
+
+    // Handle lack of input fnames
     if (!args.positional.size()) {
-        std::cout  
-            << "sgraph, version " << VERSION        << std::endl << std::endl
-            << "usage: sgraph fname1 ... fnameN"    << std::endl;
+        std::cout << fmt_help(options, VERSION) << std::endl;
         return 1;
     } 
 
+    // Handle -s | --separator
+    char separator = ',';
+    if (auto sep_opt_it = std::find_if(args.options.begin(), args.options.end(), 
+        [](auto opt) -> bool { return (opt.first == "-s" || opt.first == "--sep"); });
+        sep_opt_it != args.options.end()) {
+        separator = std::get<char>(sep_opt_it->second);
+    }
+    
+    // Read datasets
     std::vector<Dataset> dsets;
     for (auto fname: args.positional) {
-        auto mb_dset = csv_to_dataset(fname);
+        auto mb_dset = csv_to_dataset(fname, separator);
         if (std::holds_alternative<std::string>(mb_dset)) {
             std::cerr << fmt_error(std::get<std::string>(mb_dset)) << std::endl;
             return 1;
@@ -186,16 +215,17 @@ int main(int argc, char **argv) {
         dsets.emplace_back(std::move(std::get<Dataset>(mb_dset)));
     } 
 
-    dsets = normilize_dsets(std::move(dsets));
-    for (auto &[key, val]: args.options) {
-        if (key == "-a" || key == "--average") {
-            uint32_t nneigbours = std::get<int>(val);
-            for (uint32_t i = 0; i < dsets.size(); ++i) {
-                dsets[i] = average(std::move(dsets[i]), nneigbours);
-            }
+    // Handle -a | --average
+    if (auto avg_opt_it = std::find_if(args.options.begin(), args.options.end(), 
+        [](auto opt) -> bool { return (opt.first == "-a" || opt.first == "--average"); });
+        avg_opt_it != args.options.end()) {
+        uint32_t nneigbours = std::get<int>(avg_opt_it->second);
+        for (auto &dset: dsets) {
+            dset = average(std::move(dset), nneigbours);
         }
     }
 
+    dsets = normilize_dsets(std::move(dsets));
 
     Graph graph(512, 512);
     graph.render(dsets);
