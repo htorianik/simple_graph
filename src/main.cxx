@@ -119,10 +119,35 @@ struct Graph {
         SDL_Init(SDL_INIT_VIDEO);
         SDL_CreateWindowAndRenderer(x_res, y_res, 0, &window, &renderer);
         TTF_Init();
-        arial = TTF_OpenFont("resources/arial.ttf", 24);
+        arial = TTF_OpenFont("resources/arial.ttf", 12);
     }
 
-    // 253, 255, 252 – May be useful for axis...
+    void render_annotation(uint32_t offset_x, uint32_t offset_y, SDL_Color color, std::string text) {
+        const uint32_t line_width = 40;
+        const uint32_t gap_after_line = 10;
+        SDL_Surface* font_surf = TTF_RenderText_Blended(arial, text.c_str(), {0, 0, 0, 0}); 
+        uint32_t text_width = font_surf->w;
+        uint32_t text_height = font_surf->h;
+
+        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+        SDL_RenderDrawLine(
+                renderer, 
+                offset_x, 
+                offset_y + text_height / 2,
+                offset_x + line_width,
+                offset_y + text_height / 2);
+
+        SDL_Texture* font_tex = SDL_CreateTextureFromSurface(renderer, font_surf);
+        SDL_Rect rect;
+        rect.x = offset_x + line_width + gap_after_line;
+        rect.y = offset_y;
+        rect.w = text_width; 
+        rect.h = text_height;
+        SDL_RenderCopy(renderer, font_tex, NULL, &rect);
+        SDL_FreeSurface(font_surf);
+        SDL_DestroyTexture(font_tex);
+    }
+
     template<typename TDsetsContainer, typename TAnnotationsContainer>
     void render(const TDsetsContainer &dsets, const TAnnotationsContainer &annotations) {
         const struct { uint8_t r, g, b; } 
@@ -132,6 +157,9 @@ struct Graph {
                 { 35,  87, 135},
                 {193,  41,  46},
                 {241, 211,   2},
+                {224, 119, 125},
+                { 81,  88, 187},
+                {242, 109, 249},
             };
 
         // Render canvas
@@ -153,28 +181,24 @@ struct Graph {
             } 
         } 
 
-        // Render annotation
-        auto panel_rect = std::tuple<uint32_t, uint32_t, uint32_t, uint32_t>(x_res - canvas_x_res, canvas_y_res, x_res, y_res - canvas_y_res);
+        // Render info_panel
+        SDL_Rect panel_rect;
+        panel_rect.x = 0;
+        panel_rect.y = canvas_y_res;
+        panel_rect.w = x_res;
+        panel_rect.h = y_res - canvas_y_res;
         SDL_SetRenderDrawColor(renderer, info_panel.r, info_panel.g, info_panel.b, 0);
         SDL_RenderFillRect(renderer, (SDL_Rect*)&panel_rect);  
         icolor = 0;
-        uint32_t ann_offset = 0;
-        uint32_t ann_size = 200;
-        for (auto ann: annotations) {
-            SDL_Color black = {  0,  0,  0};
-            SDL_Surface* font_surf = TTF_RenderText_Solid(arial, ann.c_str(), black); 
-            SDL_Texture* font_tex = SDL_CreateTextureFromSurface(renderer, font_surf);
-            SDL_Rect ann_rect;
-            ann_rect.x = ann_offset;
-            ann_rect.y = (canvas_y_res + y_res) / 2 - 12;
-            ann_rect.w = ann_size; 
-            ann_rect.h = 24;
-            SDL_RenderCopy(renderer, font_tex, NULL, &ann_rect);
-            SDL_FreeSurface(font_surf);
-            SDL_DestroyTexture(font_tex);
-            ann_offset += ann_size;
-        }
 
+        uint32_t counter = 0;
+        for (auto &annotation: annotations) {
+            const uint32_t offset_x = 20 + 150 * (counter / 2);
+            const uint32_t offset_y = canvas_y_res + 7 + 20 * (counter % 2);
+            const auto color = palette[counter];
+            render_annotation(offset_x, offset_y, {color.r, color.g, color.b}, annotation);
+            ++counter;
+        }
 
 		SDL_RenderPresent(renderer);		
     }
