@@ -39,7 +39,7 @@ Maybe<Dataset> csv_to_dataset(std::string fname, char separator) {
     std::ifstream csv_ss(fname);
     if (!csv_ss.is_open()) {
         std::stringstream err_ss;
-        err_ss << "Can't read file" << fname;
+        err_ss << "Can't read file \"" << fname << "\"";
         return Maybe<Dataset>(err_ss.str());
     }
 
@@ -163,18 +163,17 @@ struct Graph {
         // Render canvas
         const uint32_t canvas_x_res = x_res;
         const uint32_t canvas_y_res = y_res - 50;
-
         SDL_SetRenderDrawColor(renderer, background.r, background.g, background.b, 0);
 		SDL_RenderClear(renderer);
         uint32_t icolor = 0;
         for (auto &dset: dsets) {
-            auto color = palette[icolor++];
+            const auto color = palette[icolor++];
             SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 0);
             for (int i = 0; i < dset.size() - 1; ++i) {
-                uint32_t x1 = dset[i].first * canvas_x_res;
-                uint32_t y1 = dset[i].second * canvas_y_res;
-                uint32_t x2 = dset[i + 1].first * canvas_x_res;
-                uint32_t y2 = dset[i + 1].second * canvas_y_res;
+                const uint32_t x1 = dset[i].first * canvas_x_res;
+                const uint32_t y1 = dset[i].second * canvas_y_res;
+                const uint32_t x2 = dset[i + 1].first * canvas_x_res;
+                const uint32_t y2 = dset[i + 1].second * canvas_y_res;
                 SDL_RenderDrawLine(renderer, x1, y1, x2, y2);
             } 
         } 
@@ -222,15 +221,20 @@ int main(int argc, char **argv) {
             .short_name = "-a",
             .description = "Every value becomes average between it's 10 neighbours."
         },
+        cli_parser::Option<int> {
+            .full_name = "--res_x", 
+            .short_name = "-x",
+            .description = "Width of window in pixels (Default is 512)."
+        },
+        cli_parser::Option<int> {
+            .full_name = "--res_y",
+            .short_name = "-y",
+            .description = "Height of window in pixels (Default is 512)."
+        },
         cli_parser::Option<char> { 
             .full_name = "--sep",
             .short_name = "-s",
             .description = "Custom separator between columns in providen csv file (Defualt is ',')."
-        },
-        cli_parser::Option<std::string> {
-            .full_name = "--output",
-            .short_name = "-o",
-            .description = "Output filename. Available extensions are \".png\". (Default is \"output.png\")."
         },
         cli_parser::Option<std::tuple<>> {
             .full_name = "--help",
@@ -240,27 +244,20 @@ int main(int argc, char **argv) {
     };
 
     auto args = cli_parser::parse(argc, argv, options);
-
-    // Handle -h | --help
-    if (std::find_if(args.options.begin(), args.options.end(), 
-        [](auto opt) -> bool { return (opt.first == "-h" || opt.first == "--help"); }) != args.options.end()) {
+    if (args.occurs("--help", "-h")) {
         std::cout << fmt_help(options, VERSION) << std::endl;
         return 0;
     }
 
     // Handle lack of input fnames
     if (!args.positional.size()) {
-        std::cout << fmt_help(options, VERSION) << std::endl;
+        std::cerr << fmt_error("You must provide at least one file to graph (see sg --help).") << std::endl;
         return 1;
     } 
 
-    // Handle -s | --separator
+    // Handle separator
     char separator = ',';
-    if (auto sep_opt_it = std::find_if(args.options.begin(), args.options.end(), 
-        [](auto opt) -> bool { return (opt.first == "-s" || opt.first == "--sep"); });
-        sep_opt_it != args.options.end()) {
-        separator = std::get<char>(sep_opt_it->second);
-    }
+    if (auto sep_opt = args.get_value<char>("--sep", "-s"); sep_opt.has_value()) separator = sep_opt.value();
     
     // Read datasets
     std::vector<Dataset> dsets;
@@ -272,20 +269,22 @@ int main(int argc, char **argv) {
         } 
         dsets.emplace_back(std::move(std::get<Dataset>(mb_dset)));
     } 
+    dsets = normilize_dsets(std::move(dsets));
 
-    // Handle -a | --average
-    if (auto avg_opt_it = std::find_if(args.options.begin(), args.options.end(), 
-        [](auto opt) -> bool { return (opt.first == "-a" || opt.first == "--average"); });
-        avg_opt_it != args.options.end()) {
-        uint32_t nneigbours = std::get<int>(avg_opt_it->second);
+    // Handle average option
+    if (auto avg_opt = args.get_value<int>("--average", "-a"); avg_opt.has_value()) {
+        uint32_t nneigbours = avg_opt.value();
         for (auto &dset: dsets) {
             dset = average(std::move(dset), nneigbours);
         }
     }
 
-    dsets = normilize_dsets(std::move(dsets));
-
-    Graph graph(512, 512);
+    // Handle resolution preferences
+    uint32_t width = 512;
+    uint32_t height = 512;
+    if (auto res_x_opt = args.get_value<int>("--res_x", "-x"); res_x_opt.has_value()) width = res_x_opt.value();
+    if (auto res_y_opt = args.get_value<int>("--res_y", "-y"); res_y_opt.has_value()) height = res_y_opt.value();
+    Graph graph(width, height);
     graph.render(dsets, args.positional);
     graph.loop();
     return 0;
