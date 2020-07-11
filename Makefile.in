@@ -16,8 +16,11 @@ srcdir=@srcdir@
 sg : bin/main.o
 	$(LD) $(LDFLAGS) $(LIBS) -o bin/sg bin/main.o 
 
-bin/main.o : src/main.cxx src/arial.hpp
+bin/main.o : src/main.cxx src/arial.hpp bin
 	$(CXX) -c $(CXXFLAGS) -o bin/main.o src/main.cxx
+
+bin : 
+	mkdir bin
 
 src/arial.hpp : 
 	echo "#ifndef ARIAL_TTF_" >> src/arial.hpp 		; \
