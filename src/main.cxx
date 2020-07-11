@@ -11,8 +11,9 @@
 #include "SDL2/SDL_ttf.h"
 
 #include "cli_parser.hxx"
+#include "arial.hpp" // resources_arial_ttf, resources_arial_ttf_len
 
-#define VERSION "0.0.2 alpha"
+#define VERSION "0.0.2"
 
 template<typename T> 
 using Maybe = typename std::variant<T, std::string>;
@@ -119,30 +120,27 @@ struct Graph {
         SDL_Init(SDL_INIT_VIDEO);
         SDL_CreateWindowAndRenderer(x_res, y_res, 0, &window, &renderer);
         TTF_Init();
-        arial = TTF_OpenFont("resources/arial.ttf", 12);
+        arial = TTF_OpenFontRW(SDL_RWFromConstMem(resources_arial_ttf, resources_arial_ttf_len), 1, 12);
     }
 
     void render_annotation(uint32_t offset_x, uint32_t offset_y, SDL_Color color, std::string text) {
         const uint32_t line_width = 40;
         const uint32_t gap_after_line = 10;
         SDL_Surface* font_surf = TTF_RenderText_Blended(arial, text.c_str(), {0, 0, 0, 0}); 
-        uint32_t text_width = font_surf->w;
-        uint32_t text_height = font_surf->h;
-
         SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
         SDL_RenderDrawLine(
                 renderer, 
                 offset_x, 
-                offset_y + text_height / 2,
+                offset_y + font_surf->h / 2,
                 offset_x + line_width,
-                offset_y + text_height / 2);
+                offset_y + font_surf->h / 2);
 
         SDL_Texture* font_tex = SDL_CreateTextureFromSurface(renderer, font_surf);
         SDL_Rect rect;
         rect.x = offset_x + line_width + gap_after_line;
         rect.y = offset_y;
-        rect.w = text_width; 
-        rect.h = text_height;
+        rect.w = font_surf->w; 
+        rect.h = font_surf->h;
         SDL_RenderCopy(renderer, font_tex, NULL, &rect);
         SDL_FreeSurface(font_surf);
         SDL_DestroyTexture(font_tex);

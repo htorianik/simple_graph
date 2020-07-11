@@ -1,2 +1,26 @@
-bin/
+# Vim
 *.swp
+
+# Release
+bin/
+
+# Generic headers
+src/arial.hpp
+
+# http://www.gnu.org/software/autoconf
+autom4te.cache
+/autoscan.log
+/autoscan-*.log
+/aclocal.m4
+/compile
+/config.guess
+/config.h.in
+/config.log
+/config.status
+/config.sub
+/configure
+/configure.scan
+/depcomp
+/install-sh
+/missing
+/stamp-h1

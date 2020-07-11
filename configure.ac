@@ -1,0 +1,12 @@
+AC_INIT(simple_graph, 1.0)
+AC_PREREQ([2.69])
+AC_LANG(C++)
+AC_PROG_CXX
+CXXFLAGS='-std=c++17 -Wall -Wextra -O2'
+
+AC_CHECK_HEADERS(SDL2/SDL.h)
+AC_SEARCH_LIBS(SDL_Init, [SDL2])
+AC_CHECK_HEADERS(SDL2/SDL_ttf.h)
+AC_SEARCH_LIBS(TTF_Init, [SDL2_ttf])
+
+AC_OUTPUT(Makefile)
