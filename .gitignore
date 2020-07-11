@@ -7,8 +7,9 @@ bin/
 # Generic headers
 src/arial.hpp
 
-# http://www.gnu.org/software/autoconf
+# Autoconf
 autom4te.cache
+/Makefile
 /autoscan.log
 /autoscan-*.log
 /aclocal.m4
@@ -18,7 +19,6 @@ autom4te.cache
 /config.log
 /config.status
 /config.sub
-/configure
 /configure.scan
 /depcomp
 /install-sh
