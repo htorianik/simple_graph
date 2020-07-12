@@ -8,22 +8,24 @@ their performance. I googled `cli build plot`, google gave me these two nice lib
 [cli-plot](https://github.com/Tabcorp/cli-plot) and
 [cli-graph](https://github.com/mcastorina/graph-cli). 
 But, in my honour opinion, there is one big problem in each one: nodejs and python corresponding. 
-I don't want to deal with 20+ Mb of dependecies, thir-party runtimes when I just need to compare 
+I don't want to deal with 20+ Mb of dependecies, third-party runtimes when I just need to compare 
 performace of two programs. So I decided to write such program by my own.
 
 #### About
 What we try to achieve:
-    * Modern and high-level technology (as C++ 17).
-    * Easy to install, execute, uninstall.
-    * No huge runtime, native execution. Size of the binary file excepted to be less then 1 Mb.
-    * Easy to build and distribute in any popular platform.
-    * \*NIX-like cli interface.
+- Modern and high-level technology (as C++ 17).
+- Easy to install, execute, uninstall.
+- No huge runtime, native execution. Size of the binary file excepted to be less then 1 Mb.
+- Easy to build and distribute in any popular platform.
+- UNIX-like cli interface.
 
 ### Installation
 #### Building from source
 ##### Requirements
-SDL2 & SDL2\_ttf
-#### Compiling
+- [SDL2](https://www.libsdl.org/download-2.0.php)
+- [SDL2\_ttf](https://www.libsdl.org/projects/SDL_ttf/)
+
+##### Compiling
 ```bash
 $ git clone https://github.com/D34DStone/simple_graph && cd simple_graph
 $ ./configure && make && make install
