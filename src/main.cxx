@@ -13,7 +13,7 @@
 #include "cli_parser.hxx"
 #include "arial.hpp" // resources_arial_ttf, resources_arial_ttf_len
 
-#define VERSION "0.0.2"
+#define VERSION "0.1.0"
 
 template<typename T> 
 using Maybe = typename std::variant<T, std::string>;
@@ -169,7 +169,7 @@ struct Graph {
         for (auto &dset: dsets) {
             const auto color = palette[icolor++];
             SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 0);
-            for (int i = 0; i < dset.size() - 1; ++i) {
+            for (uint32_t i = 0; i < dset.size() - 1; ++i) {
                 const uint32_t x1 = dset[i].first * canvas_x_res;
                 const uint32_t y1 = dset[i].second * canvas_y_res;
                 const uint32_t x2 = dset[i + 1].first * canvas_x_res;
@@ -193,7 +193,7 @@ struct Graph {
             const uint32_t offset_x = 20 + 150 * (counter / 2);
             const uint32_t offset_y = canvas_y_res + 7 + 20 * (counter % 2);
             const auto color = palette[counter];
-            render_annotation(offset_x, offset_y, {color.r, color.g, color.b}, annotation);
+            render_annotation(offset_x, offset_y, {color.r, color.g, color.b, 0}, annotation);
             ++counter;
         }
 

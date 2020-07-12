@@ -89,8 +89,8 @@ namespace cli_parser {
         template<typename T>
         std::optional<T> get_value(std::string full_name, std::string short_name = "") const {
             auto option_it = std::find_if(options.begin(), options.end(), match_fs_name(full_name, short_name));
-            if (option_it != options.end() && holds_alternative<T>(option_it->second)) {
-                return get<T>(option_it->second);
+            if (option_it != options.end() && std::holds_alternative<T>(option_it->second)) {
+                return std::get<T>(option_it->second);
             } else {
                 return std::nullopt;
             }
