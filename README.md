@@ -7,7 +7,7 @@ When I finished two sources with a small optimization in the second, I decided t
 their performance. I googled `cli build plot`, google gave me these two nice libraries: 
 [cli-plot](https://github.com/Tabcorp/cli-plot) and
 [cli-graph](https://github.com/mcastorina/graph-cli). 
-But, in my honour opinion, there is one big problem in each one: nodejs and python corresponding. 
+But, in my humble opinion, there is one big problem in each one: nodejs and python corresponding. 
 I don't want to deal with 20+ Mb of dependecies, third-party runtimes when I just need to compare 
 performace of two programs. So I decided to write such program by my own.
 
