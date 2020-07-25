@@ -6,12 +6,13 @@
 #include <sstream>
 #include <variant>
 #include <algorithm>
+#include <regex>
 
 #include "SDL2/SDL.h"
 #include "SDL2/SDL_ttf.h"
 
 #include "cli_parser.hxx"
-#include "arial.hpp" // resources_arial_ttf, resources_arial_ttf_len
+#include "arial.hpp" // resources_font_ttf, resources_font_ttf_len
 
 #define VERSION "0.1.0"
 
@@ -19,11 +20,13 @@ template<typename T>
 using Maybe = typename std::variant<T, std::string>;
 using Dataset = std::vector<std::pair<float, float>>;
 
-std::string fmt_error(std::string msg) {
+template<class... Args>
+std::string fmt_error(Args&&... args) {
     const char red_mod[] = "\u001b[31m";
     const char def_mod[] = "\u001b[0m";
     std::stringstream ss;
-    ss << red_mod << "Error: " << def_mod << msg;
+    ss << red_mod << "Error: " << def_mod;
+    (ss << ... << args);
     return ss.str();
 }
 
@@ -44,8 +47,8 @@ Maybe<Dataset> csv_to_dataset(std::string fname, char separator) {
     }
 
     Dataset dset;
-    uint32_t line_number = 0;
-    uint32_t col_number = 0;
+    int line_number = 0;
+    int col_number = 0;
     for (std::string line; std::getline(csv_ss, line, '\n'); ++line_number) {
         std::vector<float> columns;
         std::stringstream line_ss(line);
@@ -77,7 +80,6 @@ std::vector<Dataset> normilize_dsets(std::vector<Dataset> &&dsets) {
             y_max = fmax(y_max, y); 
         }
     }
-
     std::transform(
             std::make_move_iterator(dsets.begin()),
             std::make_move_iterator(dsets.end()),
@@ -90,17 +92,16 @@ std::vector<Dataset> normilize_dsets(std::vector<Dataset> &&dsets) {
                 } 
                 return std::move(dset);
             });
-
     return result;
 }
 
-Dataset average(Dataset &&dset, uint32_t nneigbours) {
+Dataset average(Dataset &&dset, int nneighbours) {
      Dataset result(dset.size());
-     uint32_t n_2 = nneigbours / 2;
-     for (uint32_t i = 0; i < dset.size(); ++i) {
-         uint32_t from  = std::max(0u, i - n_2);
-         uint32_t to    = std::min(dset.size() - 1, static_cast<unsigned long>(i + n_2));
-         for (uint32_t j = from; j <= to; ++j) {
+     int n_2 = nneighbours / 2;
+     for (int i = 0; i < (int)dset.size(); ++i) {
+         int from  = std::max(0, i - n_2);
+         int to    = std::min((int)dset.size() - 1, i + n_2);
+         for (int j = from; j <= to; ++j) {
             result[i].second += dset[j].second;
          }
          result[i].first = dset[i].first;
@@ -110,106 +111,127 @@ Dataset average(Dataset &&dset, uint32_t nneigbours) {
 }
 
 struct Graph {
-    uint32_t x_res;
-    uint32_t y_res;
+    const int font_size = 12;
+    const int panel_height = 50;
+    const SDL_Color font_color { 0, 0, 0, 0 };
+    const SDL_Color plot_bg { 22, 25, 37, 0 };
+    const SDL_Color panel_bg { 253, 252, 254, 0 };
+    const std::array<SDL_Color, 6> palette {
+        SDL_Color { 35, 87, 135, 0 },
+        SDL_Color { 193, 41, 46, 0 },
+        SDL_Color { 241, 211, 2, 0 },
+        SDL_Color { 224, 119, 125, 0 },
+        SDL_Color { 81, 88, 187, 0 },
+        SDL_Color { 242, 109, 249, 0 },
+    };
+
+    int resolution_x;
+    int resolution_y;
     SDL_Renderer *renderer;
     SDL_Window *window;
-    TTF_Font *arial;
+    TTF_Font *font;
 
-    Graph(uint32_t x_res, uint32_t y_res): x_res(x_res), y_res(y_res) {
-        SDL_Init(SDL_INIT_VIDEO);
-        SDL_CreateWindowAndRenderer(x_res, y_res, 0, &window, &renderer);
-        TTF_Init();
-        arial = TTF_OpenFontRW(SDL_RWFromConstMem(resources_arial_ttf, resources_arial_ttf_len), 1, 12);
+    Graph(int resolution_x, int resolution_y): resolution_x(resolution_x), resolution_y(resolution_y) {
+        // Initializer SDL, renderer and window
+        if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+            std::cerr << fmt_error("Couldn't SDL: ", SDL_GetError()) << std::endl;
+            exit(1);
+        }
+
+        SDL_CreateWindowAndRenderer(resolution_x, resolution_y, 0, &window, &renderer);
+        if (window == NULL || renderer == NULL) {
+            std::cerr << fmt_error("Couldn't create renderer and window: ", SDL_GetError()) << std::endl;
+            exit(1);
+        }
+
+        // Initialize fonts
+        if (TTF_Init() < 0) {
+            std::cerr << fmt_error("Couldn't initialize SDL_ttf: ", TTF_GetError()) << std::endl;
+            exit(1);
+        }
+        font = TTF_OpenFontRW(SDL_RWFromConstMem(resources_arial_ttf, resources_arial_ttf_len), 1, font_size);
     }
 
-    void render_annotation(uint32_t offset_x, uint32_t offset_y, SDL_Color color, std::string text) {
-        const uint32_t line_width = 40;
-        const uint32_t gap_after_line = 10;
-        SDL_Surface* font_surf = TTF_RenderText_Blended(arial, text.c_str(), {0, 0, 0, 0}); 
-        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
-        SDL_RenderDrawLine(
-                renderer, 
-                offset_x, 
-                offset_y + font_surf->h / 2,
-                offset_x + line_width,
-                offset_y + font_surf->h / 2);
+    template<typename TDsets, typename TLabels> 
+    void render_scene(const TDsets &dsets, const TLabels &labels) {
+        SDL_Rect plot_rect{0, 0, resolution_x, resolution_y - panel_height};
+        render_plot(dsets, plot_rect);
+        SDL_Rect panel_rect{0, resolution_y - panel_height, resolution_x, panel_height};
+        render_panel(labels, panel_rect);
+    }
 
+    template<typename TCont>
+    void render_plot(const TCont &dsets, SDL_Rect rect) {
+        SDL_SetRenderDrawColor(renderer, plot_bg.r, plot_bg.g, plot_bg.b, plot_bg.a);
+        SDL_RenderFillRect(renderer, &rect);
+        for (int ndset = 0; ndset < dsets.size(); ++ndset) {
+            SDL_SetRenderDrawColor(
+                renderer, 
+                palette[ndset].r, 
+                palette[ndset].g, 
+                palette[ndset].b, 
+                palette[ndset].a);
+
+            for (int index = 0; index < dsets[ndset].size() - 1; ++index) {
+                auto [x1, y1] = dsets[ndset][index];
+                auto [x2, y2] = dsets[ndset][index + 1];
+                SDL_RenderDrawLine(
+                    renderer, 
+                    rect.w * x1 + rect.x,
+                    rect.h * y1 + rect.y,
+                    rect.w * x2 + rect.x,
+                    rect.h * y2 + rect.y);
+            }
+        }
+    }
+
+    template<typename TCont>
+    void render_panel(const TCont &labels, SDL_Rect rect) {
+        SDL_SetRenderDrawColor(renderer, panel_bg.r, panel_bg.g, panel_bg.b, panel_bg.a);
+        SDL_RenderFillRect(renderer, &rect);
+        int i = 0;
+        for (auto &label: labels) {
+            const SDL_Color color = palette[i];
+            SDL_Rect label_rect {
+                rect.x + 100 * (i / 2),
+                rect.y + (panel_height / 2) * (i % 2),
+                100, 
+                panel_height / 2 };
+            render_panel_label(label, color, label_rect);
+            ++i;
+        }
+    }
+
+    void render_panel_label(std::string text, SDL_Color color, SDL_Rect rect) {
+        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+        SDL_Surface* font_surf = TTF_RenderText_Blended(font, text.c_str(), {0, 0, 0, 0}); 
+        SDL_RenderDrawLine(
+            renderer, 
+            rect.x, 
+            rect.y + rect.h / 2,
+            rect.x + rect.w - font_surf->w,
+            rect.y + rect.h / 2);
         SDL_Texture* font_tex = SDL_CreateTextureFromSurface(renderer, font_surf);
-        SDL_Rect rect;
-        rect.x = offset_x + line_width + gap_after_line;
-        rect.y = offset_y;
-        rect.w = font_surf->w; 
-        rect.h = font_surf->h;
-        SDL_RenderCopy(renderer, font_tex, NULL, &rect);
+        SDL_Rect text_rect {
+            rect.x + rect.w - font_surf->w,
+            rect.y + (rect.h - font_surf->h) / 2,
+            font_surf->w,
+            font_surf->h };
+        SDL_RenderCopy(renderer, font_tex, NULL, &text_rect);
         SDL_FreeSurface(font_surf);
         SDL_DestroyTexture(font_tex);
     }
 
-    template<typename TDsetsContainer, typename TAnnotationsContainer>
-    void render(const TDsetsContainer &dsets, const TAnnotationsContainer &annotations) {
-        const struct { uint8_t r, g, b; } 
-            background = { 22,   25,  37},
-            info_panel = { 253, 255, 252},
-            palette[] = {
-                { 35,  87, 135},
-                {193,  41,  46},
-                {241, 211,   2},
-                {224, 119, 125},
-                { 81,  88, 187},
-                {242, 109, 249},
-            };
-
-        // Render canvas
-        const uint32_t canvas_x_res = x_res;
-        const uint32_t canvas_y_res = y_res - 50;
-        SDL_SetRenderDrawColor(renderer, background.r, background.g, background.b, 0);
-		SDL_RenderClear(renderer);
-        uint32_t icolor = 0;
-        for (auto &dset: dsets) {
-            const auto color = palette[icolor++];
-            SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 0);
-            for (uint32_t i = 0; i < dset.size() - 1; ++i) {
-                const uint32_t x1 = dset[i].first * canvas_x_res;
-                const uint32_t y1 = dset[i].second * canvas_y_res;
-                const uint32_t x2 = dset[i + 1].first * canvas_x_res;
-                const uint32_t y2 = dset[i + 1].second * canvas_y_res;
-                SDL_RenderDrawLine(renderer, x1, y1, x2, y2);
-            } 
-        } 
-
-        // Render info_panel
-        SDL_Rect panel_rect;
-        panel_rect.x = 0;
-        panel_rect.y = canvas_y_res;
-        panel_rect.w = x_res;
-        panel_rect.h = y_res - canvas_y_res;
-        SDL_SetRenderDrawColor(renderer, info_panel.r, info_panel.g, info_panel.b, 0);
-        SDL_RenderFillRect(renderer, (SDL_Rect*)&panel_rect);  
-        icolor = 0;
-
-        uint32_t counter = 0;
-        for (auto &annotation: annotations) {
-            const uint32_t offset_x = 20 + 150 * (counter / 2);
-            const uint32_t offset_y = canvas_y_res + 7 + 20 * (counter % 2);
-            const auto color = palette[counter];
-            render_annotation(offset_x, offset_y, {color.r, color.g, color.b, 0}, annotation);
-            ++counter;
-        }
-
-		SDL_RenderPresent(renderer);		
-    }
-
-    void loop() {
-        for (SDL_Event event; event.type != SDL_QUIT; SDL_PollEvent(&event)) {
-            // no-op
-        }
+    void present() {
+        SDL_RenderPresent(renderer);
+        for (SDL_Event event; event.type != SDL_QUIT; SDL_PollEvent(&event)) { /* no-op */ }
     }
 
     ~Graph() {
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
         SDL_Quit();
+        TTF_CloseFont(font);
         TTF_Quit();
     }
 };
@@ -219,7 +241,7 @@ int main(int argc, char **argv) {
         cli_parser::Option<int> {
             .full_name = "--average",
             .short_name = "-a",
-            .description = "Every value becomes average between it's 10 neighbours."
+            .description = "Every value becomes average between it's Ns neighbours."
         },
         cli_parser::Option<int> {
             .full_name = "--res_x", 
@@ -240,24 +262,23 @@ int main(int argc, char **argv) {
             .full_name = "--help",
             .short_name = "-h",
             .description = "Print help message.",
-        }
+        },
     };
 
     auto args = cli_parser::parse(argc, argv, options);
     if (args.occurs("--help", "-h")) {
         std::cout << fmt_help(options, VERSION) << std::endl;
-        return 0;
+        exit(0);
     }
 
     // Handle lack of input fnames
     if (!args.positional.size()) {
         std::cerr << fmt_error("You must provide at least one file to graph (see sg --help).") << std::endl;
-        return 1;
+        exit(1);
     } 
 
     // Handle separator
-    char separator = ',';
-    if (auto sep_opt = args.get_value<char>("--sep", "-s"); sep_opt.has_value()) separator = sep_opt.value();
+    char separator = args.get_value<char>("--sep", "-s").value_or(',');
     
     // Read datasets
     std::vector<Dataset> dsets;
@@ -265,27 +286,32 @@ int main(int argc, char **argv) {
         auto mb_dset = csv_to_dataset(fname, separator);
         if (std::holds_alternative<std::string>(mb_dset)) {
             std::cerr << fmt_error(std::get<std::string>(mb_dset)) << std::endl;
-            return 1;
+            exit(1);
         } 
         dsets.emplace_back(std::move(std::get<Dataset>(mb_dset)));
     } 
     dsets = normilize_dsets(std::move(dsets));
 
     // Handle average option
-    if (auto avg_opt = args.get_value<int>("--average", "-a"); avg_opt.has_value()) {
-        uint32_t nneigbours = avg_opt.value();
-        for (auto &dset: dsets) {
-            dset = average(std::move(dset), nneigbours);
-        }
+    int nneighbours = args.get_value<int>("--average", "-a").value_or(1);
+    if (nneighbours < 1) {
+        std::cerr << fmt_error("Number of neigbours to average must be at least 1, not ", nneighbours) << std::endl;
+        exit(1);
+    }
+    for (auto &dset: dsets) {
+        dset = average(std::move(dset), nneighbours);
     }
 
     // Handle resolution preferences
-    uint32_t width = 512;
-    uint32_t height = 512;
-    if (auto res_x_opt = args.get_value<int>("--res_x", "-x"); res_x_opt.has_value()) width = res_x_opt.value();
-    if (auto res_y_opt = args.get_value<int>("--res_y", "-y"); res_y_opt.has_value()) height = res_y_opt.value();
+    int width = args.get_value<int>("--res_x", "-x").value_or(512);
+    int height = args.get_value<int>("--res_y", "-y").value_or(512);
+    if (width <= 0 || height <= 0) {
+        std::cerr << fmt_error("Resolution must be a positive number.") << std::endl;
+        exit(1);
+    }
+
     Graph graph(width, height);
-    graph.render(dsets, args.positional);
-    graph.loop();
+    graph.render_scene(dsets, args.positional);
+    graph.present();
     return 0;
 }

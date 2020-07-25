@@ -58,3 +58,10 @@ Also, some customization is available:
 $ sg *.csv --average 10 --res_x 1024 --res_y 256
 ```
 ![double-float-comparison-advanced](https://github.com/D34DStone/simple_graph/blob/master/doc/0.1.0-screen-float-double-advanced.png?raw=true)
+
+### TODO
+- Add option to render graph to the window or to the .png file.
+- Add possibility to choose what column of csv use as x axis and what as y.
+- Add validation of uint32\_t cli-option value and check security of cli.
+- Display axis values.
+- Refactor code.
