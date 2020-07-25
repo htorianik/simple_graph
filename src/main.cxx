@@ -287,9 +287,9 @@ int main(int argc, char **argv) {
         if (std::holds_alternative<std::string>(mb_dset)) {
             std::cerr << fmt_error(std::get<std::string>(mb_dset)) << std::endl;
             exit(1);
-        } 
+        }
         dsets.emplace_back(std::move(std::get<Dataset>(mb_dset)));
-    } 
+    }
     dsets = normilize_dsets(std::move(dsets));
 
     // Handle average option
