@@ -12,7 +12,7 @@ I don't want to deal with 20+ Mb of dependecies, third-party runtimes when I jus
 performace of two programs. So I decided to write such program by my own.
 
 #### About
-What we try to achieve:
+What we are trying to achieve:
 - Modern and high-level technology (as C++ 17).
 - Easy to install, execute, uninstall.
 - No huge runtime, native execution. Size of the binary file excepted to be less then 1 Mb.
@@ -30,7 +30,6 @@ What we try to achieve:
 $ git clone https://github.com/D34DStone/simple_graph && cd simple_graph
 $ ./configure && make && make install
 ```
-That's it! No external package managers, no any special runtimes. 
 
 #### Uninstall
 ```bash
@@ -58,10 +57,3 @@ Also, some customization is available:
 $ sg *.csv --average 10 --res_x 1024 --res_y 256
 ```
 ![double-float-comparison-advanced](https://github.com/D34DStone/simple_graph/blob/master/doc/0.1.0-screen-float-double-advanced.png?raw=true)
-
-### TODO
-- Add option to render graph to the window or to the .png file.
-- Add possibility to choose what column of csv use as x axis and what as y.
-- Add validation of uint32\_t cli-option value and check security of cli.
-- Display axis values.
-- Refactor code.
